@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<navigation xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/my_nav"
+    app:startDestination="@id/mapFragment">
+
+    <fragment
+        android:id="@+id/mapFragment"
+        android:name="com.example.googlemap.MapFragment"
+        android:label="fragment_map"
+        tools:layout="@layout/fragment_map" >
+        <action
+            android:id="@+id/action_mapFragment_to_finallyFragment"
+            app:destination="@id/finallyFragment" />
+    </fragment>
+    <argument
+        android:name="possitionArg"
+        app:argType="float" />
+    <fragment
+        android:id="@+id/finallyFragment"
+        android:name="com.example.googlemap.FinallyFragment"
+        android:label="fragment_finally"
+        tools:layout="@layout/fragment_finally" >
+        <argument
+            android:name="positionArg"
+            app:argType="float[]" />
+    </fragment>
+</navigation>
