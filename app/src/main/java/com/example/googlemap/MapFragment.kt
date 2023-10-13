@@ -1,35 +1,48 @@
 package com.example.googlemap
 
-import android.graphics.Bitmap
-import android.graphics.Canvas
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.fragment.app.Fragment
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.TextView
-import androidx.cardview.widget.CardView
+import androidx.core.app.ActivityCompat
+import androidx.lifecycle.MutableLiveData
 import androidx.navigation.fragment.findNavController
 import com.example.googlemap.databinding.FragmentMapBinding
+import com.google.android.gms.location.FusedLocationProviderClient
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.maps.CameraUpdate
+import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
 import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
-import com.google.android.gms.maps.model.BitmapDescriptorFactory
+import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.Marker
 import com.google.android.gms.maps.model.MarkerOptions
+
 
 class MapFragment : Fragment(), OnMapReadyCallback {
 
     private lateinit var binding: FragmentMapBinding
     private var mGoogleMap: GoogleMap? = null
-
+    private var latLng: LatLng? = null
+    private var marker: Marker? = null
+    private lateinit var fusedLocationProviderClient: FusedLocationProviderClient
+    private val permissionCode = 101
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ): View? {
 
         binding = FragmentMapBinding.inflate(layoutInflater, container, false)
+
+        fusedLocationProviderClient =
+            LocationServices.getFusedLocationProviderClient(requireContext())
 
 
         val mapFragment =
@@ -41,63 +54,100 @@ class MapFragment : Fragment(), OnMapReadyCallback {
 //            mGoogleMap = googleMap
 //        }
 
+
         return binding.root
     }
+
 
     override fun onMapReady(p0: GoogleMap) {
         mGoogleMap = p0
 
-        val latLon1 = LatLng(41.077577, 28.918875)
-        val latLon2 = LatLng(35.029791, 58.054209)
 
         val markerView = layoutInflater.inflate(
             R.layout.market_layout, binding.root as ViewGroup,
             false
         )
-        val text = markerView.findViewById<TextView>(R.id.textMarker)
-        val cardView = markerView.findViewById<CardView>(R.id.markerCardView)
+        binding.buttonLocation.setOnClickListener {
+            val zoom = 12
+            val tilt = 0
+            val bearing = 0
 
-        text.text = "I am here"
-        val bitmap1 = Bitmap.createScaledBitmap(
-            viewToBitmap(cardView)!!,
-            cardView.width,
-            cardView.height,
-            false
-        )
-        val smallMarkerIcon = BitmapDescriptorFactory.fromBitmap(bitmap1)
-        var marker = mGoogleMap!!.addMarker(MarkerOptions().position(latLon1).icon(smallMarkerIcon))
-
-        mGoogleMap!!.setOnMapClickListener { location ->
-            marker!!.remove()
-            marker =
-                mGoogleMap!!.addMarker(MarkerOptions().position(location).icon(smallMarkerIcon))
+            fetchLocation()
+            if (latLng != null) {
+                if (marker != null) {
+                    marker!!.remove()
+                }
+                val camera =
+                    CameraPosition(latLng!!, zoom.toFloat(), tilt.toFloat(), bearing.toFloat())
+                mGoogleMap!!.animateCamera(CameraUpdateFactory.newCameraPosition(camera))
+                marker = mGoogleMap!!.addMarker(MarkerOptions().position(latLng!!))
+            }
         }
 
-        binding.buttonSet.setOnClickListener {
+//++++
+        mGoogleMap!!.setOnMapClickListener { location ->
+            if (marker != null)
+                marker!!.remove()
+            marker =
+                mGoogleMap!!.addMarker(MarkerOptions().position(location))
+        }
+//++++
+
+        binding.buttonSet.setOnClickListener {                             //send args
             val latitude = marker!!.position.latitude.toFloat()
             val longitude = marker!!.position.longitude.toFloat()
-            val position = floatArrayOf(latitude,longitude)
+            val position = floatArrayOf(latitude, longitude)
 
             val action = MapFragmentDirections.actionMapFragmentToFinallyFragment(position)
             findNavController().navigate(action)
         }
-
-
-//        text.text = "I am here too"
-//        val bitmap2 = Bitmap.createScaledBitmap(viewToBitmap(cardView)!!,cardView.width,cardView.height,false)
-//        val smallMarkerIcon2=BitmapDescriptorFactory.fromBitmap(bitmap2)
-        mGoogleMap!!.addMarker(MarkerOptions().position(latLon2))
     }
 
-    private fun viewToBitmap(view: View): Bitmap {
-        view.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED)
-        val bitMap =
-            Bitmap.createBitmap(view.measuredWidth, view.measuredHeight, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitMap)
-        view.layout(0, 0, view.measuredWidth, view.measuredHeight)
-        view.draw(canvas)
-        return bitMap
+
+    private fun fetchLocation() {
+
+        if (ActivityCompat.checkSelfPermission(
+                requireContext(),
+                Manifest.permission.ACCESS_FINE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(
+                requireContext(),
+                Manifest.permission.ACCESS_COARSE_LOCATION
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            ActivityCompat.requestPermissions(
+                requireActivity(), arrayOf(Manifest.permission.ACCESS_FINE_LOCATION),
+                permissionCode
+            )
+
+            return
+        }
+
+        fusedLocationProviderClient.lastLocation.addOnSuccessListener { location ->
+            if (location != null) {
+                val lat = location.latitude
+                val lon = location.longitude
+                latLng = LatLng(lat, lon)
+
+
+            }
+        }
     }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int, permissions: Array<String?>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        when (requestCode) {
+            permissionCode -> if (grantResults.isNotEmpty() && grantResults[0] ==
+                PackageManager.PERMISSION_GRANTED
+            ) {
+                fetchLocation()
+                // todo :
+            }
+        }
+    }
+
 
 }
 
